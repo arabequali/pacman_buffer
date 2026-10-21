@@ -22,5 +22,5 @@ class Display:
                 if (event.type == pygame.QUIT):
                     running = False
 
-            screen.blit(self.assets.get_asset("walls.png"), (100, 100))
+            self.maze.display_maze(screen)
             pygame.display.flip()

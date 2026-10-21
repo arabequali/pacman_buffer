@@ -7,9 +7,11 @@ from src.maze import Maze
 
 
 if __name__ == '__main__':
-    maze = Maze(15, 15)
-
     assets = [f for f in listdir("assets/") if isfile(join("assets/", f))]
     assets = Assets(assets)
+
+    maze = Maze(15, 15, assets)
+    for m in maze.maze:
+        print(m)
 
     Display(maze, assets)

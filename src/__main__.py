@@ -6,6 +6,7 @@ from src.assets import Assets
 from src.maze import Maze
 from src.objects import Player
 from src.game import Game
+from src.menus import MainMenu
 
 
 if __name__ == '__main__':
@@ -15,5 +16,6 @@ if __name__ == '__main__':
     maze = Maze(15, 15, assets)
 
     game = Game(maze, assets)
+    menu = MainMenu(assets)
 
-    Display(maze, assets, game)
+    Display(maze, assets, game, menu)

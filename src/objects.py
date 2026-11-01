@@ -65,6 +65,15 @@ class Moving(Objects):
         super().__init__(x, y, asset)
         self.direction = direction
 
+    def get_direction(self) -> int:
+        return (self.direction)
+
+    def set_direction(
+        self,
+        direction: int
+    ) -> None:
+        self.direction = direction
+
 
 class Player(Moving):
 

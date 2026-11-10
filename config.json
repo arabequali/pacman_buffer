@@ -1,0 +1,10 @@
+{
+	"level_1_seed": 42,
+	"level_1_size": [29, 29],
+	"level_size_increase": 5,
+	"lives": 3,
+	"points_per_pacgum": 10,
+	"points_per_super_pacgum": 100,
+	"points_per_ghosts": 500,
+	"highscore_filename_path": "highscore.txt"
+}

@@ -45,6 +45,7 @@ class Maze:
                     live_maze[line_number].append([cell, 0])
 
         player = Player(len(live_maze) // 2, len(live_maze[0]) // 2, self.assets.get_asset("player.png"), -1)
+        player.asset.resize_asset()
         live_maze[player.x][player.y][1] = player
         return (live_maze)
 
@@ -183,9 +184,6 @@ class Maze:
         wall_w = (window_w - padding_w * 2) / len(self.live_maze)
         wall_h = (window_h - padding_h * 2) / len(self.live_maze[0])
 
-        player = self.assets.get_asset("player.png")
-        player.resize_asset(wall_w / 1.5, wall_h / 1.5)
-
         horizontal_wall_image = self.assets.get_asset("horizontal_walls.png")
         horizontal_wall_image.resize_asset(wall_w, wall_h / 10)
 
@@ -205,4 +203,6 @@ class Maze:
                 self.display_wall(surface, cell, (x0, y0), (wall_w, wall_h), (horizontal_wall_image.image, vertical_wall_image.image))
 
                 if cell_info != 0:
-                    surface.blit(cell_info.asset.image, (x0 + player.image.get_width() / 2, y0 + player.image.get_height() / 2))
+                    if isinstance(cell_info, Pacgum):
+                        cell_info.asset.resize_asset(wall_w / 2, wall_h / 2)
+                    surface.blit(cell_info.asset.image, (x0 + cell_info.asset.image.get_width() / 2, y0 + cell_info.asset.image.get_height() / 2))

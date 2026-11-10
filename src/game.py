@@ -91,7 +91,8 @@ class Game:
 
     def action_pipeline(
         self,
-        key_pressed: Sequence[bool]
+        key_pressed: Sequence[bool],
+        ticking: int
     ) -> None:
 
         values = self.maze.search_player()
@@ -109,11 +110,12 @@ class Game:
         elif key_pressed[pygame.K_UP] and self.can_up(line_index, cell_index):
             player.set_direction(0)
 
-        if   player.get_direction() == 3 and self.can_left(line_index, cell_index):
-            self.go_left(player, line_index, cell_index)
-        elif player.get_direction() == 2 and self.can_down(line_index, cell_index):
-            self.go_down(player, line_index, cell_index)
-        elif player.get_direction() == 1 and self.can_right(line_index, cell_index):
-            self.go_right(player, line_index, cell_index)
-        elif player.get_direction() == 0 and self.can_up(line_index, cell_index):
-            self.go_up(player, line_index, cell_index)
+        if ticking % 10 == 0:
+            if player.get_direction() == 3 and self.can_left(line_index, cell_index):
+                self.go_left(player, line_index, cell_index)
+            elif player.get_direction() == 2 and self.can_down(line_index, cell_index):
+                self.go_down(player, line_index, cell_index)
+            elif player.get_direction() == 1 and self.can_right(line_index, cell_index):
+                self.go_right(player, line_index, cell_index)
+            elif player.get_direction() == 0 and self.can_up(line_index, cell_index):
+                self.go_up(player, line_index, cell_index)

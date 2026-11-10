@@ -40,20 +40,28 @@ class Display:
         ticking = 0
         in_main_menu = True
         in_game = False
+        key_pressed = None
         buffer_key_pressed = None
         menu_action = 0
 
         running = True
         while (running):
 
-            screen.fill('black')
-            key_pressed = None
+            screen.fill('dark blue')
+            if ticking % 10 == 0 and key_pressed:
+                key_pressed = None
 
             for event in pygame.event.get():
                 if (event.type == pygame.QUIT):
                     running = False
 
-            key_pressed = pygame.key.get_pressed()
+            if not key_pressed and not buffer_key_pressed:
+                buffer_key_pressed = pygame.key.get_pressed()
+            elif buffer_key_pressed:
+                key_pressed = buffer_key_pressed
+                buffer_key_pressed = None
+            else:
+                key_pressed = pygame.key.get_pressed()
             if in_main_menu:
                 if ticking % 10 == 0 and key_pressed:
                     menu_action = self.menu.menu_action(key_pressed)
@@ -62,8 +70,8 @@ class Display:
                     in_main_menu = False
                     in_game = True
             elif in_game:
-                if ticking % 10 == 0 and key_pressed:
-                    self.game.action_pipeline(key_pressed)
+                if key_pressed:
+                    self.game.action_pipeline(key_pressed, ticking)
                 self.maze.maze_pipeline(screen, self.window_w, self.window_h, self.padding_w, self.padding_h)
                 self.maze.display_score(screen, self.game)
 

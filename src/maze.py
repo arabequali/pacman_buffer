@@ -1,208 +1,118 @@
-import mazegenerator
-import pygame
+"""Maze built on top of the assigned `mazegenerator` package."""
+
+import logging
+from collections import deque
 from typing import Any
 
-from src.objects import Player, Pacgum, SuperPacgum
-from src.assets import Asset
+from src.objects import Direction
+
+log = logging.getLogger("pacman.maze")
+
+CLOSED = 15  # fully walled cell (the '42' pattern of the generator)
+
+
+class MazeError(Exception):
+    """Raised when a maze cannot be generated or is unusable."""
+
 
 class Maze:
+    """A grid of cells; each int holds the walls of that cell.
 
-    def __init__(
-        self,
-        maze_w: int,
-        maze_h: int,
-        assets
-    ) -> None:
+    Bits: 1 = north, 2 = east, 4 = south, 8 = west wall.
+    Coordinates are (x, y) = (column, row).
+    """
 
-        self.maze = mazegenerator.MazeGenerator((maze_w, maze_h)).maze
-        self.assets = assets
-        self.live_maze = self._create_live_maze()
+    def __init__(self, grid: list[list[int]]) -> None:
+        """Validate the grid and precompute the playable area."""
+        if (not grid or not grid[0]
+                or any(len(row) != len(grid[0]) for row in grid)):
+            raise MazeError("maze grid is empty or not rectangular")
+        if any(not isinstance(c, int) or isinstance(c, bool)
+               or not 0 <= c <= 15 for row in grid for c in row):
+            raise MazeError("maze grid contains invalid cell values")
+        self.grid = grid
+        self.height = len(grid)
+        self.width = len(grid[0])
+        self._fields: dict[tuple[int, int], list[list[int]]] = {}
+        self.corners = [(0, 0), (self.width - 1, 0),
+                        (0, self.height - 1),
+                        (self.width - 1, self.height - 1)]
+        self.playable = self._flood(self.corners[0])
+        for corner in self.corners:
+            if corner not in self.playable:
+                raise MazeError("generated maze is not connected")
+        self.start = self._find_start()
 
-    def get_maze(self) -> list[list[int]]:
-        return (self.maze)
+    @classmethod
+    def generate(cls, width: int, height: int, seed: int = 0) -> "Maze":
+        """Generate a maze with the assigned package (seed 0 = random).
 
-    def get_live_maze(self) -> list[list[list[int]]]:
-        return (self.live_maze)
-
-    def _create_live_maze(self) -> list[list[list[Any]]]:
+        PERFECT is False so the maze has loops and no dead ends.
         """
-        The live maze will put every objects in the cell + the walls opened or close.
-        0: nothing in cell
-        1: pacgum in cell
-        2: pacman in cell
-        3: ghost in cell
+        try:
+            import mazegenerator
+            generator = mazegenerator.MazeGenerator(
+                (width, height), perfect=False, seed=seed)
+            grid: Any = generator.maze
+            return cls([list(row) for row in grid])
+        except MazeError:
+            raise
+        except Exception as exc:
+            raise MazeError(f"maze generator failed: {exc}") from exc
+
+    def cell(self, x: int, y: int) -> int:
+        """Wall bits of cell (x, y)."""
+        return self.grid[y][x]
+
+    def can_move(self, x: int, y: int, direction: Direction) -> bool:
+        """True if one can walk from (x, y) towards `direction`."""
+        nx, ny = x + direction.dx, y + direction.dy
+        if not (0 <= nx < self.width and 0 <= ny < self.height):
+            return False
+        if self.grid[y][x] & direction.wall_bit:
+            return False
+        return self.grid[ny][nx] != CLOSED
+
+    def _flood(self, origin: tuple[int, int]) -> set[tuple[int, int]]:
+        """All cells reachable from `origin`."""
+        seen = {origin}
+        queue = deque([origin])
+        while queue:
+            x, y = queue.popleft()
+            for d in Direction:
+                if self.can_move(x, y, d):
+                    nxt = (x + d.dx, y + d.dy)
+                    if nxt not in seen:
+                        seen.add(nxt)
+                        queue.append(nxt)
+        return seen
+
+    def _find_start(self) -> tuple[int, int]:
+        """Playable cell closest to the centre of the maze."""
+        cx, cy = (self.width - 1) / 2, (self.height - 1) / 2
+        return min(self.playable, key=lambda c: (
+            (c[0] - cx) ** 2 + (c[1] - cy) ** 2, c[1], c[0]))
+
+    def distance_field(self, x: int, y: int) -> list[list[int]]:
+        """Walking distance from (x, y) to every cell (-1 if unreachable).
+
+        Results are cached because ghosts ask for the same field often.
         """
-
-        pacgum_asset = self.assets.get_asset("pacgum.png")
-
-        live_maze = []
-        for line_number, line in enumerate(self.maze):
-            live_maze.append([])
-            for cell_number, cell in enumerate(line):
-                if cell != 15:
-                    live_maze[line_number].append([cell, Pacgum(cell_number, line_number, pacgum_asset, 10)])
-                else:
-                    live_maze[line_number].append([cell, 0])
-
-        player = Player(len(live_maze) // 2, len(live_maze[0]) // 2, self.assets.get_asset("player.png"), -1)
-        player.asset.resize_asset()
-        live_maze[player.x][player.y][1] = player
-        return (live_maze)
-
-    def is_pacgum(
-        self,
-        line: int,
-        index: int,
-    ) -> None:
-        if (isinstance(self.live_maze[line][index][1], Pacgum) or isinstance(self.live_maze[line][index][1], SuperPacgum)):
-            return (1)
-        return (0)
-
-    def search_player(self) -> tuple[int]:
-        for line_index, line in enumerate(self.live_maze):
-            for cell_index, cell in enumerate(line):
-                if (isinstance(cell[1], Player)):
-                    return (tuple([cell_index, line_index]))
-        return (tuple([None, None]))
-
-    def modify_cell_live_maze(
-        self,
-        line: int,
-        index: int,
-        new_object: Any
-    ) -> None:
-        self.live_maze[line][index][1] = new_object
-
-    def display_score(
-        self,
-        surface: pygame.Surface,
-        game
-    ) -> None:
-
-        score = str(game.score)
-
-        score_asset = self.assets.get_asset("score.png")
-        score_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        zero_asset = self.assets.get_asset("zero.png")
-        zero_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        one_asset = self.assets.get_asset("one.png")
-        one_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        two_asset = self.assets.get_asset("two.png")
-        two_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        three_asset = self.assets.get_asset("three.png")
-        three_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        four_asset = self.assets.get_asset("four.png")
-        four_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        five_asset = self.assets.get_asset("five.png")
-        five_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        six_asset = self.assets.get_asset("six.png")
-        six_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        seven_asset = self.assets.get_asset("seven.png")
-        seven_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        eight_asset = self.assets.get_asset("eight.png")
-        eight_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        nine_asset = self.assets.get_asset("nine.png")
-        nine_asset.resize_asset(surface.get_width() / 30, surface.get_height() / 30)
-
-        surface.blit(score_asset.image, (0, 0))
-        for i in range(len(score)):
-            if score[i] == '0':
-                surface.blit(zero_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '1':
-                surface.blit(one_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '2':
-                surface.blit(two_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '3':
-                surface.blit(three_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '4':
-                surface.blit(four_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '5':
-                surface.blit(five_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '6':
-                surface.blit(six_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '7':
-                surface.blit(seven_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '8':
-                surface.blit(eight_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-            elif score[i] == '9':
-                surface.blit(nine_asset.image, ((surface.get_width() / 30) * (i + 1), 0))
-
-    def display_wall(
-        self,
-        surface: pygame.Surface,
-        cell: int,
-        live_pos: tuple[int],
-        walls_size: tuple[int],
-        walls_assets: tuple[pygame.Surface]
-    ) -> None:
-
-        x0 = live_pos[0]
-        y0 = live_pos[1]
-
-        wall_w = walls_size[0]
-        wall_h = walls_size[1]
-
-        x1 = x0 + wall_w
-        y1 = y0 + wall_h
-
-        hor_wall_image = walls_assets[0]
-        ver_wall_image = walls_assets[1]
-
-        if cell >= 8:
-            surface.blit(ver_wall_image, (x0, y0))
-            cell -= 8
-        if cell >= 4:
-            surface.blit(hor_wall_image, (x0, y1))
-            cell -= 4
-        if cell >= 2:
-            surface.blit(ver_wall_image, (x1, y0))
-            cell -= 2
-        if cell >= 1:
-            surface.blit(hor_wall_image, (x0, y0))
-            cell -= 1
-
-    def maze_pipeline(
-        self,
-        surface: pygame.Surface,
-        window_w,
-        window_h,
-        padding_w,
-        padding_h
-    ) -> None:
-        """Display the maze according to the live_maze"""
-
-        wall_w = (window_w - padding_w * 2) / len(self.live_maze)
-        wall_h = (window_h - padding_h * 2) / len(self.live_maze[0])
-
-        horizontal_wall_image = self.assets.get_asset("horizontal_walls.png")
-        horizontal_wall_image.resize_asset(wall_w, wall_h / 10)
-
-        vertical_wall_image = self.assets.get_asset("vertical_walls.png")
-        vertical_wall_image.resize_asset(wall_w / 10, wall_h)
-
-        for line_index, line in enumerate(self.live_maze):
-
-            for number_index, number in enumerate(line):
-
-                cell = number[0]
-                cell_info = number[1]
-
-                x0 = padding_w + number_index * wall_w
-                y0 = padding_h + line_index * wall_h
-
-                self.display_wall(surface, cell, (x0, y0), (wall_w, wall_h), (horizontal_wall_image.image, vertical_wall_image.image))
-
-                if cell_info != 0:
-                    if isinstance(cell_info, Pacgum):
-                        cell_info.asset.resize_asset(wall_w / 2, wall_h / 2)
-                    surface.blit(cell_info.asset.image, (x0 + cell_info.asset.image.get_width() / 2, y0 + cell_info.asset.image.get_height() / 2))
+        key = (x, y)
+        if key in self._fields:
+            return self._fields[key]
+        field = [[-1] * self.width for _ in range(self.height)]
+        field[y][x] = 0
+        queue = deque([key])
+        while queue:
+            cx, cy = queue.popleft()
+            for d in Direction:
+                if self.can_move(cx, cy, d):
+                    nx, ny = cx + d.dx, cy + d.dy
+                    if field[ny][nx] < 0:
+                        field[ny][nx] = field[cy][cx] + 1
+                        queue.append((nx, ny))
+        if len(self._fields) > 64:
+            self._fields.clear()
+        self._fields[key] = field
+        return field

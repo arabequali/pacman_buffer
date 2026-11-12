@@ -1,7 +1,7 @@
 [project]
 name = "pacman"
-version = "0.1.0"
-description = "A Pacman"
+version = "1.0.0"
+description = "A Pac-Man game"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -10,5 +10,20 @@ dependencies = [
     "pygame>=2.6.1",
 ]
 
+[dependency-groups]
+dev = [
+    "flake8>=7.0",
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "pyinstaller>=6.0",
+]
+
 [tool.uv.sources]
 mazegenerator = { path = "mazegen_wheel/mazegenerator-2.1.0-py3-none-any.whl" }
+
+[tool.mypy]
+exclude = ["mazegen_wheel/", "build/", "dist/", "\\.venv/"]
+
+[[tool.mypy.overrides]]
+module = "mazegenerator"
+ignore_missing_imports = true
